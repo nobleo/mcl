@@ -2,16 +2,17 @@
 
 #include <gtest/gtest.h>
 
+#include <nav_msgs/msg/occupancy_grid.hpp>
+
 #include "../src/map.hpp"
-#include "nav_msgs/OccupancyGrid.h"
-#include "ros/console.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "rclcpp/logging.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using ruvu_mcl::OccupancyMap;
 
 TEST(TestSuite, testCells)
 {
-  nav_msgs::OccupancyGrid msg;
+  nav_msgs::msg::OccupancyGrid msg;
   msg.info.width = 3;
   msg.info.height = 2;
   msg.data = {0, 100, -1, 100, 100, 100};
@@ -46,7 +47,7 @@ TEST(TestSuite, testCells)
 TEST(TestSuite, test_is_valid)
 {
   // set the origin with an offset and turned 90 degree
-  nav_msgs::OccupancyGrid msg;
+  nav_msgs::msg::OccupancyGrid msg;
   msg.info.width = 3;
   msg.info.height = 2;
   msg.data.resize(msg.info.width * msg.info.height);
@@ -58,15 +59,4 @@ TEST(TestSuite, test_is_valid)
   ASSERT_FALSE(map.is_valid(2, 2));
   ASSERT_FALSE(map.is_valid(-1, 0));
   ASSERT_FALSE(map.is_valid(0, -1));
-}
-
-// Run all the tests that were declared with TEST()
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -6,7 +6,7 @@
 
 #include "../particle_filter.hpp"
 #include "./utils.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 #include "tf2/utils.h"
 
 namespace ruvu_mcl

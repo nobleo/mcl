@@ -6,7 +6,19 @@
 
 #include "../config.hpp"
 #include "./laser.hpp"
-#include "ros/publisher.h"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher.hpp"
+
+// forward declare
+namespace visualization_msgs::msg
+{
+ROS_DECLARE_MESSAGE(Marker)
+}
+
+namespace ruvu_mcl_msgs::msg
+{
+ROS_DECLARE_MESSAGE(ParticleStatistics)
+}
 
 namespace ruvu_mcl
 {
@@ -22,14 +34,16 @@ public:
   /*
    * @brief BeamModel constructor
    */
-  BeamModel(const BeamModelConfig & config, const std::shared_ptr<const OccupancyMap> & map);
+  BeamModel(
+    rclcpp::Node::SharedPtr nh, const BeamModelConfig & config,
+    const std::shared_ptr<const OccupancyMap> & map);
 
   void sensor_update(ParticleFilter * pf, const LaserData & data) override;
 
 private:
   const BeamModelConfig parameters_;
   const std::shared_ptr<const OccupancyMap> map_;
-  ros::Publisher debug_pub_;
-  ros::Publisher statistics_pub_;
+  std::shared_ptr<rclcpp::Publisher<visualization_msgs::msg::Marker>> debug_pub_;
+  std::shared_ptr<rclcpp::Publisher<ruvu_mcl_msgs::msg::ParticleStatistics>> statistics_pub_;
 };
 }  // namespace ruvu_mcl

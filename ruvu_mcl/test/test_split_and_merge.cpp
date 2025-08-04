@@ -6,7 +6,7 @@
 #include "../src/config.hpp"
 #include "../src/particle_filter.hpp"
 #include "gtest/gtest.h"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 #include "tf2/utils.h"
 
 using ruvu_mcl::Config;
@@ -77,14 +77,4 @@ TEST_F(FilterTest, Split)
   }
   EXPECT_FLOAT_EQ(max_weight, 0.05 / 3);
   EXPECT_FLOAT_EQ(min_weight, 0.05 / 3);
-}
-
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

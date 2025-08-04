@@ -35,15 +35,24 @@
 #pragma once
 
 #include <functional>
+#include <map>
+#include <memory>
+#include <rclcpp/clock.hpp>
+#include <rclcpp/serialization.hpp>
+#include <rclcpp/time.hpp>
 
-#include "rosbag/bag.h"
+#include "rclcpp/serialized_message.hpp"
 
+namespace rosbag2_cpp
+{
+class Reader;
+}
 namespace ruvu_mcl
 {
 template <class T>
-using BagCallbackT = std::function<void(const boost::shared_ptr<const T> &)>;
+using BagCallbackT = std::function<void(const T &)>;
 
-using BagCallback = std::function<void(const rosbag::MessageInstance &)>;
+using BagCallback = std::function<void(const rclcpp::SerializedMessage &)>;
 
 /**
  * @brief A class for playing back bag files
@@ -56,7 +65,8 @@ public:
   /**
    * @brief Constructor expecting the filename of a bag
    */
-  explicit BagPlayer(const std::string & filename);
+  explicit BagPlayer(const std::string & filename, rclcpp::Clock::SharedPtr clock);
+  ~BagPlayer();
 
   /**
    * @brief Register a callback for a specific topic and type
@@ -77,26 +87,28 @@ public:
   void start_play();
 
   // The bag file interface loaded in the constructor.
-  rosbag::Bag bag;
+  std::unique_ptr<rosbag2_cpp::Reader> bag;
 
 private:
-  ros::Time real_time(const ros::Time & msg_time) const;
+  rclcpp::Time real_time(const rclcpp::Time & msg_time) const;
 
   std::map<std::string, BagCallback> cbs_;
-  ros::Time bag_start_;
-  ros::Time bag_end_;
-  ros::Time last_message_time_;
+  rclcpp::Time bag_start_;
+  rclcpp::Time bag_end_;
+  rclcpp::Time last_message_time_;
   double playback_speed_;
-  ros::Time play_start_;
+  rclcpp::Time play_start_;
+  rclcpp::Clock::SharedPtr clock_;
 };
 
 template <class T>
 void BagPlayer::register_callback(const std::string & topic, BagCallbackT<T> cb)
 {
-  cbs_[topic] = [cb](const rosbag::MessageInstance & m) {
-    const auto msg = m.instantiate<T>();
-    assert(msg);
-    cb(msg);
+  cbs_[topic] = [cb](const rclcpp::SerializedMessage & m) {
+    T deserialized_msg;
+    rclcpp::Serialization<T> serialization;
+    serialization.deserialize_message(&m, &deserialized_msg);
+    cb(deserialized_msg);
   };
 }
 }  // namespace ruvu_mcl

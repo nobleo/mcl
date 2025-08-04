@@ -1,40 +1,29 @@
-# Copyright 2021 RUVU Robotics B.V.
-
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8)
 project(ruvu_mcl_msgs)
 
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  std_msgs
-  message_generation
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(rosidl_default_generators REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  msg/LandmarkEntry.msg
+  msg/LandmarkList.msg
+  msg/ParticleStatistics.msg
+  srv/AddLandmark.srv
+  DEPENDENCIES geometry_msgs std_msgs
 )
 
-add_message_files(
-  FILES
-    LandmarkEntry.msg
-    LandmarkList.msg
-    ParticleStatistics.msg
-)
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
 
-add_service_files(
-  FILES
-  AddLandmark.srv
-)
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_cpplint)
+  ament_lint_auto_find_test_dependencies()
+  ament_cpplint(FILTERS -build/include_order)
+endif()
 
-generate_messages(
-  DEPENDENCIES
-    std_msgs
-    geometry_msgs
-)
-
-
-###################################
-## catkin specific configuration ##
-###################################
-
-catkin_package(
-  CATKIN_DEPENDS
-    geometry_msgs
-    message_runtime
-    std_msgs
-)
+ament_package()

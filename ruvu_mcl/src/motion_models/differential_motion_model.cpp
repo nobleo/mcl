@@ -7,7 +7,7 @@
 #include "../particle_filter.hpp"
 #include "../rng.hpp"
 #include "angles/angles.h"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 #include "tf2/utils.h"
 
 constexpr auto name = "differential_motion_model";
@@ -78,9 +78,9 @@ std::array<double, 3> DifferentialMotionModel::calculate_deltas(const tf2::Trans
 
   double delta_rot2 = tf2::getYaw(delta.getRotation()) - delta_rot1;
 
-  ROS_DEBUG_NAMED(name, "delta_rot1: %f", delta_rot1);
-  ROS_DEBUG_NAMED(name, "delta_trans: %f", delta_trans);
-  ROS_DEBUG_NAMED(name, "delta_rot2: %f", delta_rot2);
+  RCLCPP_DEBUG(rclcpp::get_logger(name), "delta_rot1: %f", delta_rot1);
+  RCLCPP_DEBUG(rclcpp::get_logger(name), "delta_trans: %f", delta_trans);
+  RCLCPP_DEBUG(rclcpp::get_logger(name), "delta_rot2: %f", delta_rot2);
   return {delta_rot1, delta_trans, delta_rot2};
 }
 }  // namespace ruvu_mcl

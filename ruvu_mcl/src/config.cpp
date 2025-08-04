@@ -4,7 +4,7 @@
 
 #include <numeric>
 
-#include "ruvu_mcl/AMCLConfig.h"
+#include "ruvu_mcl/parameters.hpp"
 
 namespace ruvu_mcl
 {
@@ -15,7 +15,7 @@ void normalize(std::initializer_list<double *> zs)
   for (double * z : zs) *z /= z_total;
 }
 
-Config::Config(const ruvu_mcl::AMCLConfig & config)
+Config::Config(const ruvu_mcl::Params & config)
 {
   min_particles = config.min_particles;
   max_particles = config.max_particles;
@@ -33,7 +33,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
   initial_cov[1 * 6 + 1] = config.initial_cov_yy;
   initial_cov[5 * 6 + 5] = config.initial_cov_aa;
 
-  if (config.odom_model_type == ruvu_mcl::AMCL_diff_const) {
+  if (config.odom_model_type == "diff") {
     DifferentialMotionModelConfig m;
     m.alpha1 = config.odom_alpha1;
     m.alpha2 = config.odom_alpha2;
@@ -46,7 +46,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     throw std::runtime_error(ss.str());
   }
 
-  if (config.laser_model_type == ruvu_mcl::AMCL_beam_const) {
+  if (config.laser_model_type == "beam") {
     BeamModelConfig c;
     c.z_hit = config.laser_z_hit;
     c.z_short = config.laser_z_short;
@@ -58,7 +58,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     c.global_frame_id = config.global_frame_id;
     normalize({&c.z_hit, &c.z_short, &c.z_max, &c.z_rand});
     laser = c;
-  } else if (config.laser_model_type == ruvu_mcl::AMCL_likelihood_field_const) {
+  } else if (config.laser_model_type == "likelihood_field") {
     LikelihoodFieldModelConfig c;
     c.z_hit = config.laser_z_hit;
     c.z_rand = config.laser_z_rand;
@@ -73,7 +73,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     throw std::runtime_error(ss.str());
   }
 
-  if (config.landmark_model_type == ruvu_mcl::AMCL_landmark_gaussian_const) {
+  if (config.landmark_model_type == "gaussian") {
     GaussianLandmarkModelConfig c;
     c.z_rand = config.landmark_z_rand;
     c.landmark_sigma_r = config.landmark_sigma_r;
@@ -81,7 +81,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     c.landmark_max_r_confidence = config.landmark_max_r_confidence;
     c.global_frame_id = config.global_frame_id;
     landmark = c;
-  } else if (config.landmark_model_type == ruvu_mcl::AMCL_landmark_likelihood_field_const) {
+  } else if (config.landmark_model_type == "likelihood_field") {
     LandmarkLikelihoodFieldModelConfig c;
     c.z_rand = config.landmark_z_rand;
     c.sigma_hit = config.landmark_sigma_hit;
@@ -93,7 +93,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     throw std::runtime_error(ss.str());
   }
 
-  if (config.adaptive_type == ruvu_mcl::AMCL_kld_sampling) {
+  if (config.adaptive_type == "kld_sampling") {
     KLDSamplingConfig c;
     c.min_particles = config.min_particles;
     c.max_particles = config.max_particles;
@@ -102,7 +102,7 @@ Config::Config(const ruvu_mcl::AMCLConfig & config)
     c.xy_grid_size = config.xy_grid_size;
     c.theta_grid_size = config.theta_grid_size;
     adaptive = c;
-  } else if (config.adaptive_type == ruvu_mcl::AMCL_split_and_merge) {
+  } else if (config.adaptive_type == "split_and_merge") {
     SplitAndMergeConfig c;
     c.xy_grid_size = config.xy_grid_size;
     c.theta_grid_size = config.theta_grid_size;

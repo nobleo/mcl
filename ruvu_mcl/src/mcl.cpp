@@ -15,7 +15,7 @@
 #include "./sensor_models/gaussian_landmark_model.hpp"
 #include "./sensor_models/landmark_likelihood_field_model.hpp"
 #include "./sensor_models/likelihood_field_model.hpp"
-#include "ros/node_handle.h"
+#include "rclcpp/node.hpp"
 #include "tf2/utils.h"
 
 constexpr auto name = "mcl";
@@ -23,23 +23,29 @@ constexpr auto name = "mcl";
 namespace ruvu_mcl
 {
 std::unique_ptr<Laser> create_laser_model(
-  const Config & config, const nav_msgs::OccupancyGridConstPtr & map)
+  rclcpp::Node::SharedPtr node, const Config & config,
+  const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & map)
 {
-  ROS_INFO_NAMED(name, "adding a laser sensor model");
+  RCLCPP_INFO(rclcpp::get_logger(name), "adding a laser sensor model");
   if (const auto * c = std::get_if<BeamModelConfig>(&config.laser))
-    return std::make_unique<BeamModel>(*c, std::make_shared<OccupancyMap>(*map));
+    return std::make_unique<BeamModel>(node, *c, std::make_shared<OccupancyMap>(*map));
   else if (const auto * c = std::get_if<LikelihoodFieldModelConfig>(&config.laser))
-    return std::make_unique<LikelihoodFieldModel>(*c, std::make_shared<DistanceMap>(*map));
+    return std::make_unique<LikelihoodFieldModel>(
+      node, *c, std::make_shared<DistanceMap>(node, *map));
   else
     throw std::logic_error("no laser model configured");
 }
 
-Mcl::Mcl() : Mcl(std::make_shared<Rng>()) {}
+Mcl::Mcl(const rclcpp::Node::SharedPtr & node) : Mcl(node, std::make_shared<Rng>()) {}
 
-Mcl::Mcl(uint_fast32_t seed) : Mcl(std::make_shared<Rng>(seed)) {}
+Mcl::Mcl(const rclcpp::Node::SharedPtr & node, uint_fast32_t seed)
+: Mcl(node, std::make_shared<Rng>(seed))
+{
+}
 
-Mcl::Mcl(const std::shared_ptr<Rng> & rng)
-: config_(),
+Mcl::Mcl(const rclcpp::Node::SharedPtr & node, const std::shared_ptr<Rng> & rng)
+: node_(node),
+  config_(),
   rng_(rng),
   last_odom_pose_(),
   last_filter_update_(),
@@ -58,7 +64,7 @@ Mcl::Mcl(const std::shared_ptr<Rng> & rng)
 
 void Mcl::configure(const Config & config)
 {
-  ROS_INFO_NAMED(name, "configure call");
+  RCLCPP_INFO(rclcpp::get_logger(name), "configure call");
   config_ = config;
 
   // they will configure themself on next scan_cb
@@ -81,7 +87,7 @@ void Mcl::configure(const Config & config)
 
   if (filter_.particles.empty()) {
     PoseWithCovariance p{config.initial_pose, config.initial_cov};
-    initial_pose_cb(ros::Time::now(), p);
+    initial_pose_cb(node_->get_clock()->now(), p);
   }
 }
 
@@ -95,11 +101,11 @@ bool Mcl::scan_cb(const LaserData & scan, const tf2::Transform & odom_pose)
   adaptive_->after_odometry_update(&filter_);
 
   if (!map_) {
-    ROS_WARN_NAMED(name, "no map yet received, skipping sensor model");
+    RCLCPP_WARN(rclcpp::get_logger(name), "no map yet received, skipping sensor model");
     return false;
   }
   if (!laser_) {
-    laser_ = create_laser_model(config_, map_);
+    laser_ = create_laser_model(node_, config_, map_);
   }
 
   laser_->sensor_update(&filter_, scan);
@@ -129,15 +135,15 @@ bool Mcl::landmark_cb(const LandmarkList & landmarks, const tf2::Transform & odo
   adaptive_->after_odometry_update(&filter_);
 
   if (!landmarks_) {
-    ROS_WARN_NAMED(name, "no landmark list yet received, skipping sensor model");
+    RCLCPP_WARN(rclcpp::get_logger(name), "no landmark list yet received, skipping sensor model");
     return false;
   }
   if (!landmark_model_) {
-    ROS_INFO_NAMED(name, "adding a landmark sensor model");
+    RCLCPP_INFO(rclcpp::get_logger(name), "adding a landmark sensor model");
     if (const auto * c = std::get_if<GaussianLandmarkModelConfig>(&config_.landmark))
-      landmark_model_ = std::make_unique<GaussianLandmarkModel>(*c, *landmarks_);
+      landmark_model_ = std::make_unique<GaussianLandmarkModel>(node_, *c, *landmarks_);
     else if (const auto * c = std::get_if<LandmarkLikelihoodFieldModelConfig>(&config_.landmark))
-      landmark_model_ = std::make_unique<LandmarkLikelihoodFieldModel>(*c, *landmarks_);
+      landmark_model_ = std::make_unique<LandmarkLikelihoodFieldModel>(node_, *c, *landmarks_);
     else
       throw std::logic_error("no landmark model configured");
   }
@@ -161,27 +167,27 @@ bool Mcl::landmark_cb(const LandmarkList & landmarks, const tf2::Transform & odo
   return true;
 }
 
-void Mcl::map_cb(const nav_msgs::OccupancyGridConstPtr & map)
+void Mcl::map_cb(const std::shared_ptr<const nav_msgs::msg::OccupancyGrid> & map)
 {
-  ROS_INFO_NAMED(name, "map received");
+  RCLCPP_INFO(rclcpp::get_logger(name), "map received");
   map_ = map;
   laser_ = nullptr;
 }
 
 void Mcl::landmark_list_cb(const LandmarkList & landmarks)
 {
-  ROS_INFO_NAMED(name, "landmark list received");
+  RCLCPP_INFO(rclcpp::get_logger(name), "landmark list received");
   landmarks_ = std::make_shared<LandmarkList>(landmarks);
   landmark_model_ = nullptr;
 }
 
-void Mcl::initial_pose_cb(const ros::Time & stamp, const PoseWithCovariance & initial_pose)
+void Mcl::initial_pose_cb(const rclcpp::Time & stamp, const PoseWithCovariance & initial_pose)
 {
   const auto & p = initial_pose.pose;
   const auto & covariance = initial_pose.covariance;
-  ROS_INFO_NAMED(
-    name, "initial pose received %.3f %.3f %.3f, spawning %lu new particles", p.getOrigin().x(),
-    p.getOrigin().y(), tf2::getYaw(p.getRotation()), config_.max_particles);
+  RCLCPP_INFO(
+    rclcpp::get_logger(name), "initial pose received %.3f %.3f %.3f, spawning %lu new particles",
+    p.getOrigin().x(), p.getOrigin().y(), tf2::getYaw(p.getRotation()), config_.max_particles);
 
   auto dx = rng_->normal_distribution(p.getOrigin().x(), covariance[0 * 6 + 0]);
   auto dy = rng_->normal_distribution(p.getOrigin().y(), covariance[1 * 6 + 1]);
@@ -206,13 +212,13 @@ void Mcl::request_nomotion_update()
 }
 
 bool Mcl::odometry_update(
-  const std_msgs::Header & header, const MeasurementType & measurement_type,
+  const std_msgs::msg::Header & header, const MeasurementType & measurement_type,
   tf2::Transform odom_pose)
 {
   assert(model_);
 
   if (!last_odom_pose_) {
-    ROS_INFO_NAMED(name, "first odometry update, recording the odom pose");
+    RCLCPP_INFO(rclcpp::get_logger(name), "first odometry update, recording the odom pose");
     last_odom_pose_ = odom_pose;
     last_filter_update_ = header.stamp;
     // call should_process to record the frame_id
@@ -220,9 +226,11 @@ bool Mcl::odometry_update(
     return true;
   }
 
-  if (header.stamp <= last_filter_update_) {
-    ROS_DEBUG_STREAM_NAMED(
-      name, "skipping out-of-order measurement, " << header.stamp << " <= " << last_filter_update_);
+  if (rclcpp::Time{header.stamp} <= last_filter_update_) {
+    RCLCPP_DEBUG_STREAM(
+      node_->get_logger(), "skipping out-of-order measurement, "
+                             << rclcpp::Time{header.stamp}.seconds()
+                             << " <= " << last_filter_update_.seconds());
     return false;
   }
 
@@ -232,9 +240,9 @@ bool Mcl::odometry_update(
     return false;
   }
 
-  ROS_DEBUG_NAMED(
-    name, "movement: x=%f y=%f t=%f", diff.getOrigin().getX(), diff.getOrigin().getY(),
-    tf2::getYaw(diff.getRotation()));
+  RCLCPP_DEBUG(
+    rclcpp::get_logger(name), "movement: x=%f y=%f t=%f", diff.getOrigin().getX(),
+    diff.getOrigin().getY(), tf2::getYaw(diff.getRotation()));
 
   model_->odometry_update(&filter_, diff);
 
@@ -247,7 +255,7 @@ bool Mcl::should_process(const tf2::Transform & diff, const MeasurementKey & mea
   if (
     diff.getOrigin().length() >= config_.update_min_d ||
     fabs(tf2::getYaw(diff.getRotation())) >= config_.update_min_a) {
-    ROS_DEBUG_NAMED(name, "enough movement detected, processing all sensors");
+    RCLCPP_DEBUG(rclcpp::get_logger(name), "enough movement detected, processing all sensors");
     for (auto & s : should_process_) {
       s.second = true;
     }
@@ -258,8 +266,9 @@ bool Mcl::should_process(const tf2::Transform & diff, const MeasurementKey & mea
   }
 
   if (should_process_[measurment_key]) {
-    ROS_DEBUG_STREAM_NAMED(
-      name, "processing " << std::get<0>(measurment_key) << ' ' << std::get<1>(measurment_key));
+    RCLCPP_DEBUG_STREAM(
+      node_->get_logger(),
+      "processing " << std::get<0>(measurment_key) << ' ' << std::get<1>(measurment_key));
     should_process_[measurment_key] = false;
     return true;
   } else {

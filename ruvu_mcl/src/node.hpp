@@ -3,23 +3,23 @@
 #pragma once
 
 #include "./mcl_ros.hpp"
+#include "./message_forward.hpp"
 #include "dynamic_reconfigure/server.h"
 #include "message_filters/subscriber.h"
-#include "ros/message_forward.h"
-#include "ruvu_mcl/AMCLConfig.h"
+#include "ruvu_mcl/Params.h"
 #include "tf2_ros/message_filter.h"
 #include "tf2_ros/transform_listener.h"
 
 // forward declare
-namespace geometry_msgs
+namespace geometry_msgs::msg
 {
 ROS_DECLARE_MESSAGE(PoseWithCovarianceStamped)
 }
-namespace nav_msgs
+namespace nav_msgs::msg
 {
 ROS_DECLARE_MESSAGE(OccupancyGrid)
 }
-namespace sensor_msgs
+namespace sensor_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LaserScan)
 }
@@ -32,27 +32,28 @@ namespace ruvu_mcl
 class Node
 {
 public:
-  Node(ros::NodeHandle nh, ros::NodeHandle private_nh);
+  Node(rclcpp::Node nh, rclcpp::Node private_nh);
   ~Node();  // to handle forward declares
 
 private:
-  void scan_cb(const sensor_msgs::LaserScanConstPtr & scan);
-  void landmark_cb(const ruvu_mcl_msgs::LandmarkListConstPtr & landmarks);
-  void map_cb(const nav_msgs::OccupancyGridConstPtr & map);
-  void landmark_list_cb(const ruvu_mcl_msgs::LandmarkListConstPtr & landmark_list);
-  void initial_pose_cb(const geometry_msgs::PoseWithCovarianceStampedConstPtr & initial_pose);
+  void scan_cb(const sensor_msgs::msg::LaserScan::ConstSharedPtr & scan);
+  void landmark_cb(const ruvu_mcl_msgs::msg::LandmarkListConstPtr & landmarks);
+  void map_cb(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & map);
+  void landmark_list_cb(const ruvu_mcl_msgs::msg::LandmarkListConstPtr & landmark_list);
+  void initial_pose_cb(
+    const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr & initial_pose);
 
   // data input
   std::shared_ptr<tf2_ros::Buffer> buffer_;
   tf2_ros::TransformListener tf_listener_;
-  message_filters::Subscriber<sensor_msgs::LaserScan> laser_scan_sub_;
-  tf2_ros::MessageFilter<sensor_msgs::LaserScan> laser_scan_filter_;
-  message_filters::Subscriber<ruvu_mcl_msgs::LandmarkList> landmark_sub_;
-  tf2_ros::MessageFilter<ruvu_mcl_msgs::LandmarkList> landmark_filter_;
+  message_filters::Subscriber<sensor_msgs::msg::LaserScan> laser_scan_sub_;
+  tf2_ros::MessageFilter<sensor_msgs::msg::LaserScan> laser_scan_filter_;
+  message_filters::Subscriber<ruvu_mcl_msgs::msg::LandmarkList> landmark_sub_;
+  tf2_ros::MessageFilter<ruvu_mcl_msgs::msg::LandmarkList> landmark_filter_;
   ros::Subscriber map_sub_;
   ros::Subscriber landmark_list_sub_;
   ros::Subscriber initial_pose_sub_;
-  dynamic_reconfigure::Server<ruvu_mcl::AMCLConfig> reconfigure_server_;
+  dynamic_reconfigure::Server<ruvu_mcl::Params> reconfigure_server_;
 
   // internals
   MclRos filter_;

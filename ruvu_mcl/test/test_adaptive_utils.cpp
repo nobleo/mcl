@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "../src/adaptive/utils.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 
 using ruvu_mcl::KeyHasher;
 
@@ -53,14 +53,4 @@ TEST(AdaptiveUtils, test1)
 
   // verify that each hash is unique
   ASSERT_TRUE(is_all_unique(hashes.begin(), hashes.end()));
-}
-
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

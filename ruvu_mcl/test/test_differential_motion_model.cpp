@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 
 #include "../src/motion_models/differential_motion_model.hpp"
-#include "ros/init.h"
-#include "ros/node_handle.h"
+// #include "ros/init.h"
+// #include "ros/node_handle.h"
 #include "tf2/utils.h"
 
 using ruvu_mcl::DifferentialMotionModel;
@@ -51,14 +51,4 @@ TEST(TestSuite, testBackward)
   ASSERT_NEAR(delta_rot1, 0, eps);
   ASSERT_NEAR(delta_trans, -1, eps);
   ASSERT_NEAR(delta_rot2, 0, eps);
-}
-
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

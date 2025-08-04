@@ -156,7 +156,8 @@ class BooleanOptionalAction(Action):
 
 
 if __name__ == '__main__':
-    rospy.init_node(os.path.basename(__file__))
+    rclpy.init()
+    node = rclpy.create_node(os.path.basename(__file__))
     parser = ArgumentParser(description='Benchmark')
     parser.add_argument('relations', type=FileType('r'))
     parser.add_argument('bagfiles', type=FileType('r'), nargs='+')

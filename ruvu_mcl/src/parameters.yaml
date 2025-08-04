@@ -1,0 +1,245 @@
+ruvu_mcl:
+  min_particles:
+    type: int
+    default_value: 100
+    description: Minimum allowed number of particles.
+    validation:
+      bounds<>: [0, 1000]
+  max_particles:
+    type: int
+    default_value: 5000
+    description: Maximum allowed number of particles.
+    validation:
+      bounds<>: [0, 10000]
+  kld_err:
+    type: double
+    default_value: 0.01
+    description: Maximum error between the true distribution and the estimated distribution.
+    validation:
+      bounds<>: [0, 1]
+  kld_z:
+    type: double
+    default_value: 0.99
+    description: Upper standard normal quantile for (1 - p), where p is the probability that the error on the estimated distribution will be less than kld_err.
+    validation:
+      bounds<>: [0, 1]
+  update_min_d:
+    type: double
+    default_value: 0.2
+    description: Translational movement required before performing a filter update.
+    validation:
+      bounds<>: [0, 5]
+  update_min_a:
+    type: double
+    default_value: 0.5235987756
+    description: Rotational movement required before performing a filter update.
+    validation:
+      bounds<>: [0, 6.2831853072]
+  resample_interval:
+    type: int
+    default_value: 2
+    description: Number of filter updates required before resampling.
+    validation:
+      bounds<>: [0, 20]
+  selective_resampling:
+    type: bool
+    default_value: false
+    description: Enable selective resampling
+  transform_tolerance:
+    type: double
+    default_value: 0.1
+    description: Time with which to post-date the transform that is published, to indicate that this transform is valid into the future.
+    validation:
+      bounds<>: [0, 2]
+  tf_broadcast:
+    type: bool
+    default_value: true
+    description: When true (the default), publish results via TF. When false, do not.
+  initial_pose_x:
+    type: double
+    default_value: 0.0
+  initial_pose_y:
+    type: double
+    default_value: 0.0
+  initial_pose_a:
+    type: double
+    default_value: 0.0
+    validation:
+      bounds<>: [0.0, 6.2831853072]
+  initial_cov_xx:
+    type: double
+    default_value: 0.25
+    validation:
+      gt_eq<>: 0
+  initial_cov_yy:
+    type: double
+    default_value: 0.25
+    validation:
+      gt_eq<>: 0
+  initial_cov_aa:
+    type: double
+    default_value: 0.0685389191
+    validation:
+      bounds<>: [0, 39.4784176044]
+  laser_max_beams:
+    type: int
+    default_value: 30
+    description: How many evenly-spaced beams in each scan to be used when updating the filter.
+    validation:
+      bounds<>: [0, 250]
+  laser_z_hit:
+    type: double
+    default_value: 0.95
+    description: Mixture weight for the z_hit part of the model.
+    validation:
+      bounds<>: [0, 1]
+  laser_z_short:
+    type: double
+    default_value: 0.1
+    description: Mixture weight for the z_short part of the model.
+    validation:
+      bounds<>: [0, 1]
+  laser_z_max:
+    type: double
+    default_value: 0.05
+    description: Mixture weight for the z_max part of the model.
+    validation:
+      bounds<>: [0, 1]
+  laser_z_rand:
+    type: double
+    default_value: 0.05
+    description: Mixture weight for the z_rand part of the model.
+    validation:
+      bounds<>: [0, 1]
+  laser_sigma_hit:
+    type: double
+    default_value: 0.2
+    description: Standard deviation for Gaussian model used in z_hit part of the model.
+    validation:
+      bounds<>: [0, 10]
+  laser_lambda_short:
+    type: double
+    default_value: 0.1
+    description: Exponential decay parameter for z_short part of model.
+    validation:
+      bounds<>: [0, 10]
+  laser_likelihood_max_dist:
+    type: double
+    default_value: 2
+    description: Maximum distance to do obstacle inflation on map, for use in likelihood_field model.
+    validation:
+      bounds<>: [0, 20]
+  laser_model_type:
+    type: string
+    default_value: likelihood_field
+    description: Which model to use, either beam, likelihood_field or likelihood_field_prob.
+    validation:
+      one_of<>: [[beam, likelihood_field, likelihood_field_prob]]
+  landmark_model_type:
+    type: string
+    default_value: gaussian
+    description: Which model to use, either gaussian or likelihood_field.
+    validation:
+      one_of<>: [[gaussian, likelihood_field]]
+  landmark_z_rand:
+    type: double
+    default_value: 0.05
+    description: Mixture weight for the z_rand part of the model.
+    validation:
+      bounds<>: [0, 1]
+  landmark_sigma_hit:
+    type: double
+    default_value: 0.2
+    description: Standard deviation for Gaussian model used in z_hit part of the model.
+    validation:
+      bounds<>: [0, 10]
+  landmark_sigma_r:
+    type: double
+    default_value: 0.2
+    description: Standard deviation for Gaussian model used in radial part of the model.
+    validation:
+      bounds<>: [0, 10]
+  landmark_sigma_t:
+    type: double
+    default_value: 0.2
+    description: Standard deviation for Gaussian model used in angle part of the model.
+    validation:
+      bounds<>: [0, 10]
+  landmark_max_r_confidence:
+    type: double
+    default_value: 0.99
+    description: Landmarks that are outside of this confidence interval are not evaluated.
+    validation:
+      bounds<>: [0, 1]
+  odom_model_type:
+    type: string
+    default_value: diff
+    description: Which model to use, diff, omni, diff-corrected, or omni-corrected
+    validation:
+      one_of<>: [[diff, omni, diff-corrected, omni-corrected]]
+  odom_alpha1:
+    type: double
+    default_value: 0.2
+    description: Specifies the expected noise in odometry's rotation estimate from the rotational component of the robot's motion.
+    validation:
+      bounds<>: [0, 10]
+  odom_alpha2:
+    type: double
+    default_value: 0.2
+    description: Specifies the expected noise in odometry's rotation estimate from the translational component of the robot's motion.
+    validation:
+      bounds<>: [0, 10]
+  odom_alpha3:
+    type: double
+    default_value: 0.2
+    description: Specifies the expected noise in odometry's translation estimate from the translational component of the robot's motion.
+    validation:
+      bounds<>: [0, 10]
+  odom_alpha4:
+    type: double
+    default_value: 0.2
+    description: Specifies the expected noise in odometry's translation  estimate from the rotational component of the robot's motion.
+    validation:
+      bounds<>: [0, 10]
+  odom_alpha5:
+    type: double
+    default_value: 0.2
+    description: Translation-related noise parameter (only used if model is omni).
+    validation:
+      bounds<>: [0, 10]
+  odom_frame_id:
+    type: string
+    default_value: odom
+    description: Which frame to use for odometry.
+  base_frame_id:
+    type: string
+    default_value: base_link
+    description: Which frame to use for the robot base.
+  global_frame_id:
+    type: string
+    default_value: map
+    description: The name of the coordinate frame published by the localization system.
+  adaptive_type:
+    type: string
+    default_value: none
+    description: Which adaptive technique to use
+    validation:
+      one_of<>: [[none, split-and-merge, kld-sampling]]
+  xy_grid_size:
+    type: double
+    default_value: 0.03
+    description: Grid size in x and y to discretize particles into clusters for merging.
+    validation:
+      bounds<>: [0, 1]
+  theta_grid_size:
+    type: double
+    default_value: 0.02
+    description: Grid size in theta to discretize particles into clusters for merging.
+    validation:
+      bounds<>: [0, 1]
+  split_weight:
+    type: double
+    default_value: 0.0015
+    description: Split particles with weights exceeding this value into equals.
+    validation:
+      bounds<>: [0, 1]

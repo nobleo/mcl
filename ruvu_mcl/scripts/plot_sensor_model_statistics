@@ -17,7 +17,7 @@ class Plotter:
 
         _, self.axes = plt.subplots(1, self.nr_sensor_models)
 
-        self.sub = rospy.Subscriber("mcl/sensor_model_statistics", ParticleStatistics, self.statistics_cb)
+        self.sub = node.create_subscription(ParticleStatistics, "mcl/sensor_model_statistics", self.statistics_cb)
         plt.show()
 
     def statistics_cb(self, msg):
@@ -52,7 +52,8 @@ class Plotter:
 
 
 if __name__ == '__main__':
-    rospy.init_node('sensor_model_statistics_plotter')
+    rclpy.init()
+    node = rclpy.create_node('sensor_model_statistics_plotter')
     if not len(sys.argv) == 2:
         rospy.logerr("Usage: rosrun ruvu_mcl plot_sensor_model_statistics <NR_SENSOR_MODEL_SUBPLOTS>")
     else:

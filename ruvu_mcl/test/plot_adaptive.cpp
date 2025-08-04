@@ -2,17 +2,17 @@
 
 #include <gnuplot-iostream.h>
 
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include "../src/particle_filter.hpp"
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "rosbag/bag.h"
 #include "rosbag/query.h"
 #include "rosbag/view.h"
-#include "visualization_msgs/Marker.h"
 
 int main(int argc, char ** argv)
 {
@@ -31,11 +31,13 @@ int main(int argc, char ** argv)
   std::vector<std::pair<double, uint32_t>> nr_particles;
   std::cout << "Start processing bag\n";
   for (const auto & msg : view) {
-    if (visualization_msgs::MarkerConstPtr cloud = msg.instantiate<visualization_msgs::Marker>()) {
+    if (
+      visualization_msgs::msg::Marker::ConstSharedPtr cloud =
+        msg.instantiate<visualization_msgs::msg::Marker>()) {
       nr_particles.emplace_back(cloud->header.stamp.toSec(), cloud->colors.size() / 2);
     } else if (
-      geometry_msgs::PoseWithCovarianceStampedConstPtr pose =
-        msg.instantiate<geometry_msgs::PoseWithCovarianceStamped>()) {
+      geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr pose =
+        msg.instantiate<geometry_msgs::msg::PoseWithCovarianceStamped>()) {
       double cov_size = std::fabs(pose->pose.covariance[0]) + std::fabs(pose->pose.covariance[7]) +
                         std::fabs(pose->pose.covariance[35]);
       cov_data.emplace_back(pose->header.stamp.toSec(), cov_size);

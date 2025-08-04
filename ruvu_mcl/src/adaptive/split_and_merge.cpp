@@ -9,7 +9,7 @@
 
 #include "../particle_filter.hpp"
 #include "./utils.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 #include "tf2/utils.h"
 
 constexpr auto name = "split_and_merge";
@@ -18,7 +18,7 @@ namespace ruvu_mcl
 {
 SplitAndMerge::SplitAndMerge(const Config & config)
 {
-  ROS_INFO_NAMED(name, "Using SplitAndMerge adaptive method");
+  RCLCPP_INFO(rclcpp::get_logger(name), "Using SplitAndMerge adaptive method");
   adaptive_config_ = std::get<SplitAndMergeConfig>(config.adaptive);
   config_ = config;
 }
@@ -70,9 +70,9 @@ void SplitAndMerge::merge_particles(ParticleFilter * pf) const
       nr_particles -= cluster.second.size() - 1;
     }
   }
-  ROS_DEBUG_NAMED(
-    name, "merging reduced particles from %zu to %zu particles", pf->particles.size(),
-    merged_particles.size());
+  RCLCPP_DEBUG(
+    rclcpp::get_logger(name), "merging reduced particles from %zu to %zu particles",
+    pf->particles.size(), merged_particles.size());
   pf->particles = merged_particles;
 }
 
@@ -92,9 +92,9 @@ void SplitAndMerge::split_particles(ParticleFilter * pf) const
     }
   }
 
-  ROS_DEBUG_NAMED(
-    name, "splitting increased particles from %zu to %zu particles", pf->particles.size(),
-    pf->particles.size() + spawn_particles.size());
+  RCLCPP_DEBUG(
+    rclcpp::get_logger(name), "splitting increased particles from %zu to %zu particles",
+    pf->particles.size(), pf->particles.size() + spawn_particles.size());
   for (const auto & particle : spawn_particles) {
     pf->particles.push_back(particle);
   }

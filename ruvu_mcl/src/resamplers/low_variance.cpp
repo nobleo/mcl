@@ -6,7 +6,7 @@
 
 #include "../particle_filter.hpp"
 #include "../rng.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 
 constexpr auto name = "low_variance";
 
@@ -17,7 +17,7 @@ LowVariance::LowVariance(const std::shared_ptr<Rng> & rng) : rng_(rng) {}
 void LowVariance::resample(ParticleFilter * pf, int needed_particles)
 {
   assert(!pf->particles.empty());
-  ROS_DEBUG_NAMED(name, "resample");
+  RCLCPP_DEBUG(rclcpp::get_logger(name), "resample");
   // Low-variance resampling (Page 86 Probabilistc Robotics)
   double step_size = 1. / needed_particles;
   auto gen_uniform = rng_->uniform_distribution(0, step_size);

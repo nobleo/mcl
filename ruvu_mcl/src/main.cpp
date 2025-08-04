@@ -1,9 +1,9 @@
 // Copyright 2021 RUVU Robotics B.V.
 
 #include "./node.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
+#include "rclcpp/node.hpp"
 #include "ros/init.h"
-#include "ros/node_handle.h"
 
 using ruvu_mcl::Node;
 
@@ -14,11 +14,11 @@ constexpr auto name = "main";
 */
 int main(int argc, char ** argv)
 {
-  ros::init(argc, argv, "mcl");
-  ros::NodeHandle nh;
-  ros::NodeHandle private_nh{"~"};
+  rclcpp::init(argc, argv);
+  auto nh = rclcpp::Node::make_shared("mcl");
+  rclcpp::Node private_nh{"~"};
   Node node{nh, private_nh};
-  ROS_INFO_NAMED(name, "%s started", private_nh.getNamespace().c_str());
-  ros::spin();
+  RCLCPP_INFO(rclcpp::get_logger(name), "%s started", private_nh.getNamespace().c_str());
+  rclcpp::spin(node);
   return EXIT_SUCCESS;
 }

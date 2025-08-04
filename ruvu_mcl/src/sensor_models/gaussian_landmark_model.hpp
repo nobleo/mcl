@@ -4,12 +4,15 @@
 
 #include <kdtree++/kdtree.hpp>
 
+#include "../message_forward.hpp"
 #include "./landmark.hpp"
-#include "ros/message_forward.h"
-#include "ros/publisher.h"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher.hpp"
+#include "ruvu_mcl_msgs/msg/particle_statistics.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 // forward declare
-namespace ruvu_mcl_msgs
+namespace ruvu_mcl_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LandmarkList)
 }
@@ -37,7 +40,9 @@ public:
   /*
    * @brief GaussianLandmarkModel constructor
    */
-  GaussianLandmarkModel(const GaussianLandmarkModelConfig & config, const LandmarkList & map);
+  GaussianLandmarkModel(
+    rclcpp::Node::SharedPtr nh, const GaussianLandmarkModelConfig & config,
+    const LandmarkList & map);
 
   void sensor_update(ParticleFilter * pf, const LandmarkList & data);
 
@@ -51,7 +56,7 @@ private:
 
   KDTreeType tree_;
 
-  ros::Publisher debug_pub_;
-  ros::Publisher statistics_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr debug_pub_;
+  rclcpp::Publisher<ruvu_mcl_msgs::msg::ParticleStatistics>::SharedPtr statistics_pub_;
 };
 }  // namespace ruvu_mcl

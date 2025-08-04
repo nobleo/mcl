@@ -2,17 +2,17 @@
 
 #pragma once
 
+#include <std_msgs/msg/header.hpp>
 #include <vector>
 
-#include "ros/message_forward.h"
-#include "std_msgs/Header.h"
+#include "../message_forward.hpp"
 #include "tf2/LinearMath/Transform.h"
 
-namespace sensor_msgs
+namespace sensor_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LaserScan)
 }
-namespace ruvu_mcl_msgs
+namespace ruvu_mcl_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LandmarkList)
 }
@@ -58,19 +58,19 @@ public:
   LandmarkList() : header(), pose(tf2::Transform::getIdentity()), landmarks() {}
 
   /**
-   * @brief Create a landmark list from a ruvu_mcl_msgs::LandmarkList
-   * @param msg ruvu_mcl_msgs::LandmarkList
+   * @brief Create a landmark list from a ruvu_mcl_msgs::msg::LandmarkList
+   * @param msg ruvu_mcl_msgs::msg::LandmarkList
    * @param pose For landmark measurments, the pose of the sensor relative to the base_link must be
    * given.
    */
   explicit LandmarkList(
-    const ruvu_mcl_msgs::LandmarkList & msg,
+    const ruvu_mcl_msgs::msg::LandmarkList & msg,
     const tf2::Transform & pose = tf2::Transform::getIdentity());
 
   /**
    * @brief timestamp in the header is the acquisition time of the measurement
    */
-  std_msgs::Header header;
+  std_msgs::msg::Header header;
 
   /**
    * @brief LandmarkLists from measurements should contain a pose with the transform from robot frame to sensor frame.

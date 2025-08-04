@@ -3,23 +3,25 @@
 #include "./landmark_likelihood_field_model.hpp"
 
 #include <limits>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include "../particle_filter.hpp"
-#include "ros/node_handle.h"
-#include "ruvu_mcl_msgs/ParticleStatistics.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
-#include "visualization_msgs/Marker.h"
+#include "rclcpp/node.hpp"
+#include "ruvu_mcl_msgs/msg/particle_statistics.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 namespace ruvu_mcl
 {
 LandmarkLikelihoodFieldModel::LandmarkLikelihoodFieldModel(
-  const LandmarkLikelihoodFieldModelConfig & config, const LandmarkList & landmarks)
+  rclcpp::Node::SharedPtr nh, const LandmarkLikelihoodFieldModelConfig & config,
+  const LandmarkList & landmarks)
 : config_(config), landmarks_(landmarks)
 {
   assert(config.z_rand >= 0 && config.z_rand <= 1);
-  ros::NodeHandle nh("~");
-  debug_pub_ = nh.advertise<visualization_msgs::Marker>("landmark_likelihood_field_model", 1);
-  statistics_pub_ = nh.advertise<ruvu_mcl_msgs::ParticleStatistics>("sensor_model_statistics", 1);
+  debug_pub_ =
+    nh->create_publisher<visualization_msgs::msg::Marker>("landmark_likelihood_field_model", 1);
+  statistics_pub_ =
+    nh->create_publisher<ruvu_mcl_msgs::msg::ParticleStatistics>("sensor_model_statistics", 1);
 }
 
 void LandmarkLikelihoodFieldModel::sensor_update(ParticleFilter * pf, const LandmarkList & data)
@@ -27,17 +29,17 @@ void LandmarkLikelihoodFieldModel::sensor_update(ParticleFilter * pf, const Land
   // This algorithm is based on the likelihood field range finder model (Page 143 Probabilistc Robotics)
   if (data.landmarks.empty()) return;
 
-  visualization_msgs::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker.header.frame_id = config_.global_frame_id;
-  marker.header.stamp = ros::Time::now();
-  marker.type = visualization_msgs::Marker::LINE_LIST;
-  marker.action = visualization_msgs::Marker::MODIFY;
+  marker.header.stamp = data.header.stamp;
+  marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+  marker.action = visualization_msgs::msg::Marker::MODIFY;
   tf2::toMsg(tf2::Transform::getIdentity(), marker.pose);
   marker.scale.x = 0.01;
 
   bool first = true;  // publish debug info for the first particle
   double total_weight = 0.0;
-  ruvu_mcl_msgs::ParticleStatistics statistics;
+  ruvu_mcl_msgs::msg::ParticleStatistics statistics;
 
   for (auto & particle : pf->particles) {
     double p = 0.0;
@@ -82,12 +84,12 @@ void LandmarkLikelihoodFieldModel::sensor_update(ParticleFilter * pf, const Land
 
       if (first) {
         // draw lines from the robot to the ray traced "hit"
-        geometry_msgs::Point p1, p2;
+        geometry_msgs::msg::Point p1, p2;
         tf2::toMsg(particle.pose.getOrigin(), p1);
         tf2::toMsg(hit.getOrigin(), p2);
         marker.points.push_back(p1);
         marker.points.push_back(p2);
-        std_msgs::ColorRGBA color;
+        std_msgs::msg::ColorRGBA color;
         color.a = 1;
         color.b = pz;
         color.r = 1 - pz;
@@ -100,7 +102,7 @@ void LandmarkLikelihoodFieldModel::sensor_update(ParticleFilter * pf, const Land
     p /= data.landmarks.size();
 
     // Gather data for sensor model statistics
-    if (statistics_pub_.getNumSubscribers()) {
+    if (statistics_pub_->get_subscription_count()) {
       statistics.weight_updates.push_back(p);
     }
 
@@ -112,10 +114,10 @@ void LandmarkLikelihoodFieldModel::sensor_update(ParticleFilter * pf, const Land
   // Normalize weights
   pf->normalize_weights(total_weight);
 
-  debug_pub_.publish(marker);
-  if (statistics_pub_.getNumSubscribers()) {
+  debug_pub_->publish(marker);
+  if (statistics_pub_->get_subscription_count()) {
     statistics.sensor_model = typeid(this).name();
-    statistics_pub_.publish(statistics);
+    statistics_pub_->publish(statistics);
   }
 }
 }  // namespace ruvu_mcl

@@ -5,9 +5,7 @@
 #include "../src/particle_filter.hpp"
 #include "../src/rng.hpp"
 #include "gtest/gtest.h"
-#include "ros/init.h"
 #include "tf2/utils.h"
-#include "tf2_eigen/tf2_eigen.h"
 
 using ruvu_mcl::ParticleFilter;
 using ruvu_mcl::Rng;
@@ -161,14 +159,4 @@ TEST_F(ParticleFilterCovarianceTest, CovarianceTransformed)
   EXPECT_NEAR(cov[1], expected[0][1], eps);
   EXPECT_NEAR(cov[6], expected[1][0], eps);
   EXPECT_NEAR(cov[7], expected[1][1], eps);
-}
-
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

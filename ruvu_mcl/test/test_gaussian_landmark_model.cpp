@@ -7,7 +7,7 @@
 #include "../src/config.hpp"
 #include "../src/particle_filter.hpp"
 #include "../src/sensor_models/gaussian_landmark_model.hpp"
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 
 using ruvu_mcl::GaussianLandmarkModel;
 using ruvu_mcl::GaussianLandmarkModelConfig;
@@ -19,6 +19,8 @@ class GaussianLandmarkModelTest : public ::testing::Test
 protected:
   void SetUp() override
   {
+    node = rclcpp::Node::make_shared("test_gaussian_landmark_model");
+
     config.z_rand = 0.1;
     config.landmark_sigma_r = 0.1;
     config.landmark_sigma_t = 0.1;
@@ -30,9 +32,10 @@ protected:
 
   void SetUp(const LandmarkList & map)
   {
-    model = std::make_unique<GaussianLandmarkModel>(config, map);
+    model = std::make_unique<GaussianLandmarkModel>(node, config, map);
   }
 
+  rclcpp::Node::SharedPtr node;
   GaussianLandmarkModelConfig config;
   std::unique_ptr<GaussianLandmarkModel> model;
   ParticleFilter pf;
@@ -111,21 +114,8 @@ TEST_F(GaussianLandmarkModelTest, test_laser_and_particle_offset)
   q.setRPY(0, 0, -M_PI / 4);
   data.pose = tf2::Transform{q, tf2::Vector3{2, -1, 0}};
   model->sensor_update(&pf, data);
-  ROS_INFO("pf: %f %f", pf.particles[0].weight, pf.particles[1].weight);
+  RCLCPP_INFO(
+    rclcpp::get_logger("RuvuMcl"), "pf: %f %f", pf.particles[0].weight, pf.particles[1].weight);
   ASSERT_DOUBLE_EQ(pf.particles[0].weight, 1.0 / (1 + config.z_rand));
   ASSERT_DOUBLE_EQ(pf.particles[1].weight, 0.1 / (1 + config.z_rand));
-}
-
-/**
- * @brief Test measurement with a laser offset and a particle to the left
- */
-
-int main(int argc, char ** argv)
-{
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -13,26 +13,31 @@ Copyright 2021 RUVU Robotics B.V.
 
   <license>TODO</license>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>dynamic_reconfigure</depend>
   <depend>libgnuplot-iostream-dev</depend>
-  <depend>rosbag</depend>
-  <depend>roscpp</depend>
+  <depend>rosbag2</depend>
+  <depend>rclcpp</depend>
   <depend>ruvu_mcl_msgs</depend>
   <depend>tf2_eigen</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>tf2_ros</depend>
+  <depend>generate_parameter_library</depend>
+  <depend>rclcpp_components</depend>
 
   <build_depend>libkdtree++-dev</build_depend>
 
   <exec_depend>graphicsmagick</exec_depend>
 
+  <test_depend>ament_clang_format</test_depend>
+  <test_depend>ament_cmake_cppcheck</test_depend>
+  <test_depend>ament_cmake_cpplint</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
   <test_depend>benchmark</test_depend>
-  <test_depend>roslint</test_depend>
-  <test_depend>ruvu_lint</test_depend>
 
   <export>
-    <rosdoc config="rosdoc.yaml" />
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

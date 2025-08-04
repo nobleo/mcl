@@ -11,7 +11,7 @@
 namespace ruvu_mcl
 {
 // forward declare
-class AMCLConfig;
+struct Params;
 
 struct KLDSamplingConfig
 {
@@ -81,7 +81,7 @@ struct SplitAndMergeConfig
 
 struct Config
 {
-  explicit Config(const ruvu_mcl::AMCLConfig & config);
+  explicit Config(const ruvu_mcl::Params & config);
   Config() = default;
 
   size_t min_particles;

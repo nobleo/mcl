@@ -4,19 +4,19 @@
 
 #include <algorithm>
 #include <limits>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 #include <queue>
 #include <utility>
 
-#include "nav_msgs/OccupancyGrid.h"
-#include "ros/console.h"
-#include "ros/node_handle.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "rclcpp/logging.hpp"
+#include "rclcpp/node.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 constexpr auto name = "map";
 
 namespace ruvu_mcl
 {
-Map::Map(const nav_msgs::OccupancyGrid & msg)
+Map::Map(const nav_msgs::msg::OccupancyGrid & msg)
 {
   scale = msg.info.resolution;
 
@@ -26,14 +26,14 @@ Map::Map(const nav_msgs::OccupancyGrid & msg)
   if (msg.info.width * msg.info.height != msg.data.size())
     throw std::runtime_error("msg.info.width * msg.info.height != msg.data.size()");
 
-  ROS_INFO_NAMED(
-    name, "Converted a %d X %d map @ %.3f m/pix (%f MB)", msg.info.width, msg.info.height,
-    msg.info.resolution, msg.data.size() / 1024.0 / 1024.0);
+  RCLCPP_INFO(
+    rclcpp::get_logger(name), "Converted a %d X %d map @ %.3f m/pix (%f MB)", msg.info.width,
+    msg.info.height, msg.info.resolution, msg.data.size() / 1024.0 / 1024.0);
 }
 
-Map::operator nav_msgs::OccupancyGrid() const
+Map::operator nav_msgs::msg::OccupancyGrid() const
 {
-  nav_msgs::OccupancyGrid msg;
+  nav_msgs::msg::OccupancyGrid msg;
   msg.info.resolution = scale;
 
   tf2::toMsg(origin.inverse(), msg.info.origin);
@@ -48,7 +48,7 @@ std::pair<Eigen::Index, Eigen::Index> Map::world2map(const tf2::Vector3 & v) con
   return {i, j};
 }
 
-OccupancyMap::OccupancyMap(const nav_msgs::OccupancyGrid & msg) : Map(msg)
+OccupancyMap::OccupancyMap(const nav_msgs::msg::OccupancyGrid & msg) : Map(msg)
 {
   /**
    * copy the data from the message
@@ -131,13 +131,12 @@ bool operator<(const QueueData & a, const QueueData & b)
   return a.distance > b.distance;  // lower prio is earlier
 }
 
-DistanceMap::DistanceMap(const nav_msgs::OccupancyGrid & msg) : Map(msg)
+DistanceMap::DistanceMap(rclcpp::Node::SharedPtr nh, const nav_msgs::msg::OccupancyGrid & msg)
+: Map(msg)
 {
-  // during unittests, skip ros publishing
-  if (ros::isInitialized()) {
-    ros::NodeHandle nh("~");
-    debug_pub_ = nh.advertise<nav_msgs::OccupancyGrid>("distance_map", 1, true);
-  }
+  // TODO(Ramon): during unittests, skip ros publishing
+  debug_pub_ = nh->create_publisher<nav_msgs::msg::OccupancyGrid>(
+    "distance_map", rclcpp::QoS{1}.transient_local());
 
   // TODO(Ramon): move common parsing functionality to a utility function
   auto obstacles =
@@ -179,7 +178,7 @@ DistanceMap::DistanceMap(const nav_msgs::OccupancyGrid & msg) : Map(msg)
 
     // if the cell is already marked, the distance is always lower, so skip
     if (cells(i, j) >= 0) {
-      // ROS_DEBUG_NAMED(name, "skipping already marked %zi %zi", i, j);
+      // RCLCPP_DEBUG(rclcpp::get_logger(name), "skipping already marked %zi %zi", i, j);
       return;
     }
 
@@ -188,7 +187,7 @@ DistanceMap::DistanceMap(const nav_msgs::OccupancyGrid & msg) : Map(msg)
     auto dj = j - l;
 
     double distance = cells(i, j) = sqrt(di * di + dj * dj) * scale;
-    // ROS_DEBUG_NAMED(name, "marking %zi %zi with %f", i, j, distance);
+    // RCLCPP_DEBUG(rclcpp::get_logger(name), "marking %zi %zi with %f", i, j, distance);
     q.push(QueueData{distance, {i, j}, {k, l}});
   };
 
@@ -197,20 +196,20 @@ DistanceMap::DistanceMap(const nav_msgs::OccupancyGrid & msg) : Map(msg)
     q.pop();
 
     auto [i, j] = d.cell;
-    // ROS_DEBUG_NAMED(name, "processing %zi %zi of distance %f", i, j, d.distance);
+    // RCLCPP_DEBUG(rclcpp::get_logger(name), "processing %zi %zi of distance %f", i, j, d.distance);
     enqueue(d.source, {i - 1, j});
     enqueue(d.source, {i, j - 1});
     enqueue(d.source, {i + 1, j});
     enqueue(d.source, {i, j + 1});
   }
 
-  if (debug_pub_.getNumSubscribers())
-    debug_pub_.publish(static_cast<nav_msgs::OccupancyGrid>(*this));
+  if (debug_pub_->get_subscription_count())
+    debug_pub_->publish(static_cast<nav_msgs::msg::OccupancyGrid>(*this));
 }
 
-DistanceMap::operator nav_msgs::OccupancyGrid() const
+DistanceMap::operator nav_msgs::msg::OccupancyGrid() const
 {
-  auto msg = Map::operator nav_msgs::OccupancyGrid();
+  auto msg = Map::operator nav_msgs::msg::OccupancyGrid();
   msg.data.resize(cells.size());
 
   Eigen::Map<Eigen::Matrix<int8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>(

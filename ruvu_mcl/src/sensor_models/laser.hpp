@@ -2,14 +2,14 @@
 
 #pragma once
 
+#include <std_msgs/msg/header.hpp>
 #include <vector>
 
-#include "ros/message_forward.h"
-#include "std_msgs/Header.h"
+#include "../message_forward.hpp"
 #include "tf2/LinearMath/Transform.h"
 
 // forward declare
-namespace sensor_msgs
+namespace sensor_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LaserScan)
 }
@@ -31,7 +31,7 @@ public:
    * @param scan ROS message
    * @param pose The position of the scanner relative to base_link
    */
-  LaserData(const sensor_msgs::LaserScan & scan, const tf2::Transform & pose);
+  LaserData(const sensor_msgs::msg::LaserScan & scan, const tf2::Transform & pose);
 
   /**
    * @brief Calculate the angle of the i'th beam
@@ -41,7 +41,7 @@ public:
   /**
    * @brief timestamp in the header is the acquisition time of the first ray in the scan.
    */
-  std_msgs::Header header;
+  std_msgs::msg::Header header;
   /**
    * @brief how the laser is mounted relative to base_link
    */

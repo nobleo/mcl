@@ -3,12 +3,11 @@
 #include "./laser.hpp"
 
 #include <limits>
-
-#include "sensor_msgs/LaserScan.h"
+#include <sensor_msgs/msg/laser_scan.hpp>
 
 namespace ruvu_mcl
 {
-LaserData::LaserData(const sensor_msgs::LaserScan & scan, const tf2::Transform & pose)
+LaserData::LaserData(const sensor_msgs::msg::LaserScan & scan, const tf2::Transform & pose)
 : header(scan.header),
   pose(pose),
   angle_min(scan.angle_min),

@@ -34,31 +34,40 @@
 
 #include "./bag_player.hpp"
 
-#include <string>
-#include <vector>
+#include <rosbag2_transport/reader_writer_factory.hpp>
 
-#include "ros/init.h"
-#include "rosbag/view.h"
+#include "rosbag2_cpp/reader.hpp"
 
 namespace ruvu_mcl
 {
-BagPlayer::BagPlayer(const std::string & filename)
+rclcpp::Time chrono_to_rclcpp_time(const std::chrono::system_clock::time_point & tp)
 {
-  bag.open(filename, rosbag::bagmode::Read);
-  ros::Time::init();
-  rosbag::View v(bag);
-  bag_start_ = v.getBeginTime();
-  bag_end_ = v.getEndTime();
-  last_message_time_ = ros::Time(0);
+  return rclcpp::Time(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count());
+}
+
+BagPlayer::BagPlayer(const std::string & filename, rclcpp::Clock::SharedPtr clock) : clock_(clock)
+{
+  rosbag2_storage::StorageOptions reader_storage_options;
+  reader_storage_options.uri = filename;
+  bag = rosbag2_transport::ReaderWriterFactory::make_reader(reader_storage_options);
+  bag->open(reader_storage_options);
+
+  auto metadata = bag->get_metadata();
+  bag_start_ = chrono_to_rclcpp_time(metadata.starting_time);
+  bag_end_ = chrono_to_rclcpp_time(metadata.starting_time + metadata.duration);
+  last_message_time_ = rclcpp::Time(0);
   playback_speed_ = 1.0;
 }
+
+BagPlayer::~BagPlayer() {}
 
 void BagPlayer::set_playback_speed(double scale)
 {
   if (scale > 0.0) playback_speed_ = scale;
 }
 
-ros::Time BagPlayer::real_time(const ros::Time & msg_time) const
+rclcpp::Time BagPlayer::real_time(const rclcpp::Time & msg_time) const
 {
   return play_start_ + (msg_time - bag_start_) * (1 / playback_speed_);
 }
@@ -68,20 +77,25 @@ void BagPlayer::start_play()
   std::vector<std::string> topics;
   for (const auto & cb : cbs_) topics.push_back(cb.first);
 
-  rosbag::View view(bag, rosbag::TopicQuery(topics), bag_start_, bag_end_);
-  play_start_ = ros::Time::now();
+  rosbag2_storage::StorageFilter filter;
+  filter.topics = topics;
+  bag->set_filter(filter);
 
-  for (rosbag::MessageInstance const & m : view) {
-    if (!ros::ok()) break;
+  play_start_ = clock_->now();
 
-    if (cbs_.find(m.getTopic()) == cbs_.end()) continue;
+  while (bag->has_next() and rclcpp::ok()) {
+    auto msg = bag->read_next();
 
-    ros::Time::sleepUntil(real_time(m.getTime()));
-    ros::spinOnce();  // handle dynamic reconfigure calls
+    if (cbs_.find(msg->topic_name) == cbs_.end()) continue;
 
-    last_message_time_ = m.getTime(); /* this is the recorded time */
-    auto cb = cbs_[m.getTopic()];
-    cb(m);
+    clock_->sleep_until(real_time(rclcpp::Time(msg->send_timestamp)));
+
+    // TODO(Ramon): spin
+
+    last_message_time_ = rclcpp::Time(msg->send_timestamp);
+    auto cb = cbs_[msg->topic_name];
+    rclcpp::SerializedMessage extracted_serialized_msg(*msg->serialized_data);
+    cb(extracted_serialized_msg);
   }
 }
 }  // namespace ruvu_mcl

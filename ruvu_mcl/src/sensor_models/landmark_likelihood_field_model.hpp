@@ -3,12 +3,15 @@
 #pragma once
 
 #include "../config.hpp"
+#include "../message_forward.hpp"
 #include "./landmark.hpp"
-#include "ros/message_forward.h"
-#include "ros/publisher.h"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher.hpp"
+#include "ruvu_mcl_msgs/msg/particle_statistics.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 // forward declare
-namespace ruvu_mcl_msgs
+namespace ruvu_mcl_msgs::msg
 {
 ROS_DECLARE_MESSAGE(LandmarkList)
 }
@@ -25,14 +28,15 @@ public:
    * @brief LikelihoodFieldModel constructor
    */
   LandmarkLikelihoodFieldModel(
-    const LandmarkLikelihoodFieldModelConfig & config, const LandmarkList & landmarks);
+    rclcpp::Node::SharedPtr nh, const LandmarkLikelihoodFieldModelConfig & config,
+    const LandmarkList & landmarks);
 
   void sensor_update(ParticleFilter * pf, const LandmarkList & data) override;
 
 private:
   const LandmarkLikelihoodFieldModelConfig config_;
   const LandmarkList landmarks_;
-  ros::Publisher debug_pub_;
-  ros::Publisher statistics_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr debug_pub_;
+  rclcpp::Publisher<ruvu_mcl_msgs::msg::ParticleStatistics>::SharedPtr statistics_pub_;
 };
 }  // namespace ruvu_mcl

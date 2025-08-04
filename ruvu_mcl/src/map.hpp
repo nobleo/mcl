@@ -2,17 +2,15 @@
 
 #pragma once
 
+#include <nav_msgs/msg/occupancy_grid.hpp>
+
+#include "./message_forward.hpp"
 #include "Eigen/Core"
-#include "ros/message_forward.h"
-#include "ros/publisher.h"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher.hpp"
 #include "tf2/LinearMath/Transform.h"
 
 // forward declare
-namespace nav_msgs
-{
-ROS_DECLARE_MESSAGE(OccupancyGrid)
-}
-
 namespace ruvu_mcl
 {
 /**
@@ -31,14 +29,14 @@ struct Map
   double scale;
 
   /**
-   * @brief Construct a Map from a nav_msgs::OccupancyGrid
+   * @brief Construct a Map from a nav_msgs::msg::OccupancyGrid
    */
-  explicit Map(const nav_msgs::OccupancyGrid & msg);
+  explicit Map(const nav_msgs::msg::OccupancyGrid & msg);
 
   /**
-   * @brief Convert a Map to a nav_msgs::OccupancyGrid
+   * @brief Convert a Map to a nav_msgs::msg::OccupancyGrid
    */
-  explicit operator nav_msgs::OccupancyGrid() const;
+  explicit operator nav_msgs::msg::OccupancyGrid() const;
 
   /**
    * @brief Convert world coordinates to map indices
@@ -61,9 +59,9 @@ struct OccupancyMap : Map
   CellsType cells;
 
   /**
-   * @brief Construct a Map from a nav_msgs::OccupancyGrid
+   * @brief Construct a Map from a nav_msgs::msg::OccupancyGrid
    */
-  explicit OccupancyMap(const nav_msgs::OccupancyGrid & msg);
+  explicit OccupancyMap(const nav_msgs::msg::OccupancyGrid & msg);
 
   /**
    * @brief Check if the cells in the line between v1 and v2 are occupied
@@ -98,17 +96,17 @@ struct DistanceMap : Map
   using CellsType = Eigen::Matrix<CellType, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
 
   CellsType cells;
-  ros::Publisher debug_pub_;
+  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr debug_pub_;
 
   /**
-   * @brief Construct a DistanceMap from a nav_msgs::OccupancyGrid
+   * @brief Construct a DistanceMap from a nav_msgs::msg::OccupancyGrid
    */
-  explicit DistanceMap(const nav_msgs::OccupancyGrid & msg);
+  DistanceMap(rclcpp::Node::SharedPtr nh, const nav_msgs::msg::OccupancyGrid & msg);
 
   /**
-   * @brief Convert a DistanceMap to a nav_msgs::OccupancyGrid
+   * @brief Convert a DistanceMap to a nav_msgs::msg::OccupancyGrid
    */
-  explicit operator nav_msgs::OccupancyGrid() const;
+  explicit operator nav_msgs::msg::OccupancyGrid() const;
 
   /**
    * @brief Get the distance to the closest obstacle from a given point

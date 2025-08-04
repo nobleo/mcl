@@ -7,21 +7,21 @@
 
 #include "../map.hpp"
 #include "../particle_filter.hpp"
-#include "ros/node_handle.h"
-#include "ruvu_mcl_msgs/ParticleStatistics.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
-#include "visualization_msgs/Marker.h"
+#include "ruvu_mcl_msgs/msg/particle_statistics.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 namespace ruvu_mcl
 {
 BeamModel::BeamModel(
-  const BeamModelConfig & config, const std::shared_ptr<const OccupancyMap> & map)
+  rclcpp::Node::SharedPtr nh, const BeamModelConfig & config,
+  const std::shared_ptr<const OccupancyMap> & map)
 : parameters_(config), map_(map)
 {
   assert(parameters_.z_hit + parameters_.z_short + parameters_.z_max + parameters_.z_rand <= 1.0);
-  ros::NodeHandle nh("~");
-  debug_pub_ = nh.advertise<visualization_msgs::Marker>("beam_model", 1);
-  statistics_pub_ = nh.advertise<ruvu_mcl_msgs::ParticleStatistics>("sensor_model_statistics", 1);
+  debug_pub_ = nh->create_publisher<visualization_msgs::msg::Marker>("beam_model", 1);
+  statistics_pub_ =
+    nh->create_publisher<ruvu_mcl_msgs::msg::ParticleStatistics>("sensor_model_statistics", 1);
 }
 
 void BeamModel::sensor_update(ParticleFilter * pf, const LaserData & data)
@@ -29,17 +29,17 @@ void BeamModel::sensor_update(ParticleFilter * pf, const LaserData & data)
   // This algorithm is based on the beam range finder model (Page 129 Probabilistc Robotics)
   if (data.ranges.empty() || parameters_.max_beams <= 1) return;
 
-  visualization_msgs::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker.header.frame_id = parameters_.global_frame_id;
-  marker.header.stamp = ros::Time::now();
-  marker.type = visualization_msgs::Marker::LINE_LIST;
-  marker.action = visualization_msgs::Marker::MODIFY;
+  marker.header.stamp = data.header.stamp;
+  marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+  marker.action = visualization_msgs::msg::Marker::MODIFY;
   tf2::toMsg(tf2::Transform::getIdentity(), marker.pose);
   marker.scale.x = 0.01;
 
   bool first = true;  // publish debug info for the first particle
   double total_weight = 0.0;
-  ruvu_mcl_msgs::ParticleStatistics statistics;
+  ruvu_mcl_msgs::msg::ParticleStatistics statistics;
   auto step = (data.ranges.size() - 1) / (parameters_.max_beams - 1);
   for (auto & particle : pf->particles) {
     double p = 0.0;
@@ -89,13 +89,13 @@ void BeamModel::sensor_update(ParticleFilter * pf, const LaserData & data)
 
       if (first) {
         // draw lines from the robot to the ray traced "hit"
-        geometry_msgs::Point p1, p2;
+        geometry_msgs::msg::Point p1, p2;
         tf2::toMsg(point_laser, p1);
         tf2::toMsg(
           particle.pose * (data.pose * (tf2::Vector3{tf2Cos(a), tf2Sin(a), 0} * map_range)), p2);
         marker.points.push_back(p1);
         marker.points.push_back(p2);
-        std_msgs::ColorRGBA color;
+        std_msgs::msg::ColorRGBA color;
         color.a = 1;
         color.b = pz;
         color.r = 1 - pz;
@@ -108,7 +108,7 @@ void BeamModel::sensor_update(ParticleFilter * pf, const LaserData & data)
     p /= parameters_.max_beams;
 
     // Gather data for sensor model statistics
-    if (statistics_pub_.getNumSubscribers()) {
+    if (statistics_pub_->get_subscription_count()) {
       statistics.weight_updates.push_back(p);
     }
 
@@ -120,10 +120,10 @@ void BeamModel::sensor_update(ParticleFilter * pf, const LaserData & data)
   // Normalize weights
   pf->normalize_weights(total_weight);
 
-  debug_pub_.publish(marker);
-  if (statistics_pub_.getNumSubscribers()) {
+  debug_pub_->publish(marker);
+  if (statistics_pub_->get_subscription_count()) {
     statistics.sensor_model = typeid(this).name();
-    statistics_pub_.publish(std::move(statistics));
+    statistics_pub_->publish(std::move(statistics));
   }
 }
 }  // namespace ruvu_mcl

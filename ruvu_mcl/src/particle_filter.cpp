@@ -2,7 +2,7 @@
 
 #include "./particle_filter.hpp"
 
-#include "ros/console.h"
+#include "rclcpp/logging.hpp"
 
 constexpr auto name = "particle_filter";
 
@@ -27,8 +27,8 @@ void ParticleFilter::normalize_weights(double total_weight)
     // total_weight could be 0 due to very strange data input. We should print an error and
     // continue. If total_weight is negative or NaN, there is a bigger problem.
     assert(total_weight == 0);
-    ROS_ERROR_NAMED(
-      name,
+    RCLCPP_ERROR(
+      rclcpp::get_logger(name),
       "Total weight of particles is 0. This probably means there is a bug in one of the sensor "
       "models or they are configured incorrectly. Resetting particles to uniform weight "
       "distribution");

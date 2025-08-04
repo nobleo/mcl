@@ -9,7 +9,6 @@
 #include "../src/motion_models/differential_motion_model.hpp"
 #include "../src/particle_filter.hpp"
 #include "../src/rng.hpp"
-#include "ros/console.h"
 
 using ruvu_mcl::DifferentialMotionModel;
 using ruvu_mcl::MotionModel;
@@ -42,10 +41,6 @@ auto convert_to_gnuplot(const ParticleFilter & pf)
 
 int main()
 {
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
-
   Gnuplot gp;
   gp << "set xrange [-2:2]\n";
   gp << "set yrange [-2:2]\n";

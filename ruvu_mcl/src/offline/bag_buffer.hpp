@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include "tf2_ros/buffer.h"
+#include "tf2/buffer_core.h"
 
-namespace rosbag
+namespace rosbag2_cpp
 {
-class Bag;
+class Reader;
 }
 
 namespace ruvu_mcl
@@ -14,9 +14,5 @@ namespace ruvu_mcl
 /**
  * @brief Load all tf messages from a rosbag into a tf2_ros::Buffer
  */
-class BagBuffer : public tf2_ros::Buffer
-{
-public:
-  explicit BagBuffer(const rosbag::Bag & bag);
-};
+std::shared_ptr<const tf2::BufferCore> create_bag_buffer(rosbag2_cpp::Reader & bag);
 }  // namespace ruvu_mcl

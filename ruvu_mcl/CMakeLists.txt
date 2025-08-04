@@ -1,71 +1,35 @@
-# Copyright 2021 RUVU Robotics B.V.
-
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8)
 project(ruvu_mcl)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-  message("${PROJECT_NAME}: You did not request a specific build type: Choosing 'Release' for maximum performance")
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-  set(EXTRA_FLAGS -Wno-format-nonliteral)
-else()
-  set(EXTRA_FLAGS
-    -Wno-format-nonliteral # required for message_filter.h
-    -Wno-noexcept          # compilation on noetic
-    -Wstrict-overflow=1    # bug in gcc melodic & lower
-)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake_modules)
 
-find_package(catkin REQUIRED COMPONENTS
-  dynamic_reconfigure
-  rosbag
-  roscpp
-  ruvu_lint
-  ruvu_mcl_msgs
-  tf2_eigen
-  tf2_geometry_msgs
-  tf2_ros
-)
-
-## System dependencies are found with CMake's conventions
-find_package(Boost REQUIRED COMPONENTS system iostreams)
-
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(generate_parameter_library REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(ruvu_mcl_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(angles REQUIRED)
+find_package(rosbag2_transport REQUIRED)
+find_package(Boost REQUIRED COMPONENTS iostreams filesystem)
 find_package(GRAPHICSMAGICKCPP REQUIRED)
-
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/AMCL.cfg
-)
-
-###################################
-## catkin specific configuration ##
-###################################
-
-catkin_package(
-  CATKIN_DEPENDS
-    dynamic_reconfigure
-    roscpp
-    ruvu_mcl_msgs
-)
+find_package(rclcpp_components REQUIRED)
+find_package(nav2_map_server REQUIRED)
 
 ###########
 ## Build ##
 ###########
 
-include_directories(
-  ${catkin_INCLUDE_DIRS}
+generate_parameter_library(
+  parameters
+  src/parameters.yaml
 )
 
 add_library(${PROJECT_NAME}
@@ -80,7 +44,7 @@ add_library(${PROJECT_NAME}
   src/mcl_ros.cpp
   src/motion_models/differential_motion_model.cpp
   src/motion_models/motion_model.cpp
-  src/node.cpp
+#  src/node.cpp
   src/offline/bag_buffer.cpp
   src/offline/bag_player.cpp
   src/particle_filter.cpp
@@ -93,162 +57,100 @@ add_library(${PROJECT_NAME}
   src/sensor_models/landmark_likelihood_field_model.cpp
   src/sensor_models/laser.cpp
   src/sensor_models/likelihood_field_model.cpp
+  src/mcl_component.cpp
 )
-target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+target_compile_features(${PROJECT_NAME} PUBLIC c_std_99 cxx_std_17)
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  tf2::tf2
+  angles::angles
+  rosbag2_transport::rosbag2_transport
+  parameters
+  ${sensor_msgs_TARGETS}
+  ${visualization_msgs_TARGETS}
+  ${ruvu_mcl_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  tf2_geometry_msgs::tf2_geometry_msgs
+  rclcpp_components::component
 )
-# bug in erf_inv_initializer under valgrind
-# https://svn.boost.org/trac10/ticket/10005
-target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS)
-target_compile_warnings(${PROJECT_NAME} ${EXTRA_FLAGS})
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
-add_executable(node
-  src/main.cpp
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN "ruvu_mcl::MclComponent"
+  EXECUTABLE mcl
 )
-target_link_libraries(node
+
+add_executable(offline src/offline.cpp)
+target_link_libraries(offline PRIVATE
   ${PROJECT_NAME}
 )
-target_compile_warnings(node ${EXTRA_FLAGS})
 
-add_executable(offline
-  src/offline.cpp
+add_executable(add_map_to_rosbag src/add_map_to_rosbag.cpp)
+target_include_directories(add_map_to_rosbag
+  SYSTEM PRIVATE ${nav2_map_server_INCLUDE_DIRS}
 )
-target_link_libraries(offline
+target_link_libraries(add_map_to_rosbag PRIVATE
   ${PROJECT_NAME}
+  ${nav2_map_server_LIBRARIES}
 )
-target_compile_warnings(offline ${EXTRA_FLAGS})
 
 #############
 ## Install ##
 #############
 
-install(TARGETS node offline
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+install(
+  TARGETS ${PROJECT_NAME} parameters
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-)
-
-catkin_install_python(PROGRAMS
-    scripts/add_map_to_rosbag
-    scripts/plot_benchmark_results
-    scripts/plot_sensor_model_statistics
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+install(TARGETS offline add_map_to_rosbag
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 #############
 ## Testing ##
 #############
 
-## Linting
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
 
-# 0.12.0
-if(CATKIN_ENABLE_TESTING)
-  find_package(roslint REQUIRED)
-  if (roslint_VERSION VERSION_GREATER 0.12.0)
-    set(ROSLINT_CPP_OPTS "--filter=-whitespace/braces")
-  else()
-    set(ROSLINT_CPP_OPTS "--filter=-whitespace/braces,-build/c++11")
-  endif()
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_cpplint)
+  ament_lint_auto_find_test_dependencies()
+  ament_cpplint(FILTERS -build/include_order)
+
+  ament_add_gtest(unittests SKIP_LINKING_MAIN_LIBRARIES
+    test/test_adaptive_utils.cpp
+    test/test_differential_motion_model.cpp
+    test/test_distance_map.cpp
+    test/test_gaussian_landmark_model.cpp
+    test/test_map.cpp
+    test/test_occupancy_map.cpp
+    test/test_particle_filter.cpp
+    test/test_split_and_merge.cpp
+    test/main.cpp
+  )
+  target_link_libraries(unittests ${PROJECT_NAME})
+
+  add_executable(plot_motion_models test/plot_motion_models.cpp)
+  target_link_libraries(plot_motion_models PRIVATE ${PROJECT_NAME} Boost::iostreams Boost::filesystem)
+
+  add_executable(plot_resampling test/plot_resampling.cpp)
+  target_link_libraries(plot_resampling PRIVATE ${PROJECT_NAME} Boost::iostreams Boost::filesystem)
+
+  add_executable(render_scan test/render_scan.cpp)
+  target_include_directories(render_scan SYSTEM PRIVATE ${GRAPHICSMAGICKCPP_INCLUDE_DIRS})
+  target_link_libraries(render_scan PRIVATE ${GRAPHICSMAGICKCPP_LIBRARIES})
+  target_link_libraries(render_scan PRIVATE ${PROJECT_NAME})
 endif()
 
-set(ROSLINT_PYTHON_OPTS "--max-line-length=305")
-ruvu_lint_add_test()
+ament_export_libraries(
+  ${PROJECT_NAME}
+)
+ament_export_targets(
+  export_${PROJECT_NAME}
+)
 
-## Manual tests
-
-if(CATKIN_ENABLE_TESTING)
-  add_executable(plot_motion_models
-    test/plot_motion_models.cpp
-  )
-  target_include_directories(plot_motion_models
-    SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
-  )
-  target_link_libraries(plot_motion_models
-    ${PROJECT_NAME}
-    ${Boost_LIBRARIES}
-  )
-
-  add_executable(plot_resampling
-    test/plot_resampling.cpp
-  )
-  target_include_directories(plot_resampling
-    SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
-  )
-  target_link_libraries(plot_resampling
-    ${PROJECT_NAME}
-    ${Boost_LIBRARIES}
-  )
-
-  add_executable(plot_adaptive
-    test/plot_adaptive.cpp
-  )
-  target_include_directories(plot_adaptive
-    SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
-  )
-  target_link_libraries(plot_adaptive
-    ${PROJECT_NAME}
-    ${Boost_LIBRARIES}
-  )
-
-  add_executable(render_scan
-    test/render_scan.cpp
-  )
-  target_include_directories(render_scan
-    SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
-      ${GRAPHICSMAGICKCPP_INCLUDE_DIRS}
-  )
-  target_link_libraries(render_scan
-    ${GRAPHICSMAGICKCPP_LIBRARIES}
-    ${PROJECT_NAME}
-  )
-
-  find_package(benchmark REQUIRED)
-  add_executable(benchmark_gaussian_landmark_model
-    test/benchmark_gaussian_landmark_model.cpp
-  )
-  target_include_directories(benchmark_gaussian_landmark_model
-    SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
-  )
-  target_link_libraries(benchmark_gaussian_landmark_model
-    ${PROJECT_NAME}
-    benchmark::benchmark
-  )
-endif()
-
-## Unit tests
-
-if (CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(test_differential_motion_model test/test_differential_motion_model.cpp)
-  target_link_libraries(test_differential_motion_model ${PROJECT_NAME})
-
-  catkin_add_gtest(test_map test/test_map.cpp)
-  target_link_libraries(test_map ${PROJECT_NAME})
-
-  catkin_add_gtest(test_occupancy_map test/test_occupancy_map.cpp)
-  target_link_libraries(test_occupancy_map ${PROJECT_NAME})
-
-  catkin_add_gtest(test_distance_map test/test_distance_map.cpp)
-  target_link_libraries(test_distance_map ${PROJECT_NAME})
-
-  catkin_add_gtest(test_particle_filter test/test_particle_filter.cpp)
-  target_link_libraries(test_particle_filter ${PROJECT_NAME})
-
-  catkin_add_gtest(test_split_and_merge test/test_split_and_merge.cpp)
-  target_link_libraries(test_split_and_merge ${PROJECT_NAME})
-
-  catkin_add_gtest(test_adaptive_utils test/test_adaptive_utils.cpp)
-  target_link_libraries(test_adaptive_utils ${PROJECT_NAME})
-
-  catkin_add_gtest(test_gaussian_landmark_model test/test_gaussian_landmark_model.cpp)
-  target_link_libraries(test_gaussian_landmark_model ${PROJECT_NAME})
-endif()
+ament_package()

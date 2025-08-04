@@ -2,41 +2,54 @@
 
 #include "./bag_buffer.hpp"
 
+#include <chrono>
+#include <rosbag2_transport/reader_writer_factory.hpp>
 #include <string>
 #include <vector>
 
-#include "rosbag/bag.h"
-#include "rosbag/query.h"
-#include "rosbag/view.h"
-#include "tf2_msgs/TFMessage.h"
+#include "tf2_msgs/msg/tf_message.hpp"
 
 namespace ruvu_mcl
 {
-ros::Duration duration_from_bag(const rosbag::Bag & bag)
+std::shared_ptr<const tf2::BufferCore> create_bag_buffer(rosbag2_cpp::Reader & bag)
 {
-  std::vector<ros::Time> ts;
-  for (const auto & msg : rosbag::View(bag, rosbag::TopicQuery("/tf"))) {
-    tf2_msgs::TFMessageConstPtr tfs = msg.instantiate<tf2_msgs::TFMessage>();
-    if (tfs == nullptr) throw std::runtime_error("Received tf message with the wrong type");
-    for (const auto & tf : tfs->transforms) ts.push_back(tf.header.stamp);
-  }
+  rosbag2_storage::StorageFilter storage_filter;
+  storage_filter.topics = {"/tf", "/tf_static"};
+  bag.set_filter(storage_filter);
 
-  ROS_INFO("Loaded %zu tf messages", ts.size());
-  if (ts.empty()) throw std::runtime_error("Can't find any scans in the bagfile");
+  std::vector<geometry_msgs::msg::TransformStamped> tfs;
+  std::vector<geometry_msgs::msg::TransformStamped> static_tfs;
+  while (rclcpp::ok() && bag.has_next()) {
+    auto msg = bag.read_next();
+    rclcpp::SerializedMessage extracted_serialized_msg(*msg->serialized_data);
+    tf2_msgs::msg::TFMessage tf_message;
+    rclcpp::Serialization<decltype(tf_message)> serialization;
+    serialization.deserialize_message(&extracted_serialized_msg, &tf_message);
 
-  ROS_INFO("Loaded tf messages, first=%f last=%f", ts.front().toSec(), ts.back().toSec());
-  return ts.back() - ts.front();
-}
-
-BagBuffer::BagBuffer(const rosbag::Bag & bag) : Buffer(duration_from_bag(bag))
-{
-  std::vector<std::string> topics = {"/tf", "/tf_static"};
-  for (const auto & msg : rosbag::View(bag, rosbag::TopicQuery(topics))) {
-    auto tfs = msg.instantiate<tf2_msgs::TFMessage>();
-    if (tfs == nullptr) throw std::runtime_error("Received tf message with the wrong type");
-    for (auto & tf : tfs->transforms) {
-      this->setTransform(tf, "bagfile", msg.getTopic() == "/tf_static");
+    for (const auto & tf : tf_message.transforms) {
+      if (msg->topic_name == "/tf") {
+        tfs.push_back(tf);
+      } else if (msg->topic_name == "/tf_static") {
+        static_tfs.push_back(tf);
+      } else {
+        assert(false && "Unexpected topic name in bag file, expected /tf or /tf_static");
+      }
     }
   }
+
+  if (tfs.size() < 2) {
+    throw std::runtime_error("Not enough transforms in bag file, at least 2 are required");
+  }
+  rclcpp::Time first = tfs.front().header.stamp;
+  rclcpp::Time last = tfs.back().header.stamp;
+
+  std::chrono::nanoseconds duration{last.nanoseconds() - first.nanoseconds()};
+  auto buffer = std::make_shared<tf2::BufferCore>(duration);
+
+  for (const auto & tf : tfs) {
+    buffer->setTransform(tf, "bagfile", tf.header.frame_id == "tf_static");
+  }
+
+  return buffer;
 }
 }  // namespace ruvu_mcl

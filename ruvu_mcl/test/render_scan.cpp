@@ -3,11 +3,11 @@
 #include <Magick++.h>
 
 #include <iostream>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 
 #include "../src/map.hpp"
-#include "nav_msgs/OccupancyGrid.h"
-#include "ros/topic.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "rclcpp/wait_for_message.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using ruvu_mcl::OccupancyMap;
 
@@ -36,16 +36,18 @@ Magick::Image cells_to_image(const OccupancyMap::CellsType & cells)
 
 int main(int argc, char ** argv)
 {
-  ros::init(argc, argv, "render_scan");
-  ros::NodeHandle nh;
+  rclcpp::init(argc, argv);
+  auto nh = rclcpp::Node::make_shared("render_scan");
 
-  OccupancyMap map{*ros::topic::waitForMessage<nav_msgs::OccupancyGrid>("map")};
+  nav_msgs::msg::OccupancyGrid msg;
+  rclcpp::wait_for_message(msg, nh, "map");
+  OccupancyMap map{msg};
 
   auto range = map.calc_range(10, 10, 100, 100);
-  ROS_INFO_STREAM("range: " << range);
+  RCLCPP_INFO_STREAM(nh->get_logger(), "range: " << range);
 
-  // Magick::InitializeMagick(nullptr);
-  // auto img = cells_to_image(map.cells);
-  // img.display();
+  Magick::InitializeMagick(nullptr);
+  auto img = cells_to_image(map.cells);
+  img.display();
   return EXIT_SUCCESS;
 }

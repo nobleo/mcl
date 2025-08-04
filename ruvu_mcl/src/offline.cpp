@@ -1,112 +1,109 @@
 // Copyright 2021 RUVU Robotics B.V.
 
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <limits>
 #include <memory>
+#include <nav_msgs/msg/occupancy_grid.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <string>
 #include <vector>
 
 #include "./mcl_ros.hpp"
 #include "./offline/bag_buffer.hpp"
 #include "./offline/bag_player.hpp"
-#include "dynamic_reconfigure/server.h"
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
-#include "nav_msgs/OccupancyGrid.h"
-#include "ros/console.h"
-#include "ros/init.h"
-#include "ros/node_handle.h"
-#include "ruvu_mcl/AMCLConfig.h"
-#include "ruvu_mcl_msgs/LandmarkList.h"
-#include "sensor_msgs/LaserScan.h"
-#include "tf2_msgs/TFMessage.h"
+#include "rclcpp/logging.hpp"
+#include "rclcpp/node.hpp"
+#include "ruvu_mcl/parameters.hpp"
+#include "ruvu_mcl_msgs/msg/landmark_list.hpp"
+#include "tf2_msgs/msg/tf_message.hpp"
 
-using ruvu_mcl::BagBuffer;
 using ruvu_mcl::BagPlayer;
+using ruvu_mcl::create_bag_buffer;
 using ruvu_mcl::MclRos;
-
-constexpr auto name = "offline";
+using ruvu_mcl::ParamListener;
+using ruvu_mcl::Params;
 
 /**
  * @brief Executable for offline playback of the particle filter on ros bagfiles
  */
 int main(int argc, char ** argv)
 {
-  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-    ros::console::notifyLoggerLevelsChanged();
-  }
+  auto args = rclcpp::init_and_remove_ros_arguments(argc, argv);
+  auto nh = rclcpp::Node::make_shared("mcl");
+  auto logger = nh->get_logger();
+  RCLCPP_INFO(logger, "%s started", nh->get_name());
 
-  ros::init(argc, argv, "mcl");
-  ros::NodeHandle nh;
-  ros::NodeHandle private_nh{"~"};
-  ROS_INFO_NAMED(name, "%s started", private_nh.getNamespace().c_str());
-
-  std::vector<std::string> args;
-  ros::removeROSArgs(argc, argv, args);
   if (args.size() != 2) {
     puts("usage: offline BAGFILE");
     exit(EXIT_FAILURE);
   }
 
-  BagPlayer player{args[1]};
-  player.set_playback_speed(private_nh.param("rate", std::numeric_limits<double>::infinity()));
+  BagPlayer player{args[1], nh->get_clock()};
+  auto rate = nh->declare_parameter("rate", std::numeric_limits<double>::infinity());
+  player.set_playback_speed(rate);
 
-  auto buffer = std::make_shared<BagBuffer>(player.bag);
-  MclRos filter{nh, private_nh, buffer};
+  auto buffer = create_bag_buffer(*player.bag);
+  MclRos filter{nh, buffer};
 
-  dynamic_reconfigure::Server<ruvu_mcl::AMCLConfig> reconfigure_server;
-  reconfigure_server.setCallback([&filter](const ruvu_mcl::AMCLConfig & config, uint32_t level) {
-    ROS_INFO_NAMED(name, "reconfigure call");
-    filter.configure(config);
+  ParamListener listener{nh};
+  listener.setUserCallback([&](const Params & params) {
+    RCLCPP_INFO(logger, "reconfigure call");
+    filter.configure(params);
   });
+  filter.configure(listener.get_params());
 
-  auto scan_pub = nh.advertise<sensor_msgs::LaserScan>("scan", 100);
-  auto landmark_pub = nh.advertise<ruvu_mcl_msgs::LandmarkList>("landmarks", 100);
-  auto map_pub = nh.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
-  auto landmark_list_pub = nh.advertise<ruvu_mcl_msgs::LandmarkList>("landmark_list", 1, true);
-  auto tf_pub = nh.advertise<tf2_msgs::TFMessage>("/tf", 100);
-  auto tf_static_pub = nh.advertise<tf2_msgs::TFMessage>("/tf_static", 100, true);
+  auto scan_pub = nh->create_publisher<sensor_msgs::msg::LaserScan>("scan", 100);
+  auto landmark_pub = nh->create_publisher<ruvu_mcl_msgs::msg::LandmarkList>("landmarks", 100);
+  auto map_pub =
+    nh->create_publisher<nav_msgs::msg::OccupancyGrid>("map", rclcpp::QoS{1}.transient_local());
+  auto landmark_list_pub = nh->create_publisher<ruvu_mcl_msgs::msg::LandmarkList>(
+    "landmark_list", rclcpp::QoS{1}.transient_local());
+  auto tf_pub = nh->create_publisher<tf2_msgs::msg::TFMessage>("/tf", 100);
+  auto tf_static_pub = nh->create_publisher<tf2_msgs::msg::TFMessage>(
+    "/tf_static", rclcpp::QoS{100}.transient_local());
 
-  ros::WallDuration{0.1}.sleep();  // wait for topics to connect
+  rclcpp::WallRate r{10};
+  r.sleep();  // wait for topics to connect
 
-  player.register_callback<sensor_msgs::LaserScan>(
-    "/scan", [&filter, &scan_pub](const sensor_msgs::LaserScanConstPtr & scan) {
-      scan_pub.publish(scan);
+  player.register_callback<sensor_msgs::msg::LaserScan>(
+    "/scan", [&filter, &scan_pub](const sensor_msgs::msg::LaserScan & scan) {
+      scan_pub->publish(scan);
       filter.scan_cb(scan);
     });
 
-  player.register_callback<ruvu_mcl_msgs::LandmarkList>(
-    "/landmarks", [&filter, &landmark_pub](const ruvu_mcl_msgs::LandmarkListConstPtr & landmarks) {
-      landmark_pub.publish(landmarks);
+  player.register_callback<ruvu_mcl_msgs::msg::LandmarkList>(
+    "/landmarks", [&filter, &landmark_pub](const ruvu_mcl_msgs::msg::LandmarkList & landmarks) {
+      landmark_pub->publish(landmarks);
       filter.landmark_cb(landmarks);
     });
 
-  player.register_callback<nav_msgs::OccupancyGrid>(
-    "/map", [&filter, &map_pub](const nav_msgs::OccupancyGridConstPtr & map) {
-      map_pub.publish(map);
-      filter.map_cb(map);
+  player.register_callback<nav_msgs::msg::OccupancyGrid>(
+    "/map", [&filter, &map_pub](const nav_msgs::msg::OccupancyGrid & map) {
+      map_pub->publish(map);
+      filter.map_cb(std::make_shared<nav_msgs::msg::OccupancyGrid>(map));
     });
 
-  player.register_callback<ruvu_mcl_msgs::LandmarkList>(
+  player.register_callback<ruvu_mcl_msgs::msg::LandmarkList>(
     "/landmark_list",
-    [&filter, &landmark_list_pub](const ruvu_mcl_msgs::LandmarkListConstPtr & landmark_list) {
-      landmark_list_pub.publish(landmark_list);
+    [&filter, &landmark_list_pub](const ruvu_mcl_msgs::msg::LandmarkList & landmark_list) {
+      landmark_list_pub->publish(landmark_list);
       filter.landmark_list_cb(landmark_list);
     });
 
-  player.register_callback<geometry_msgs::PoseWithCovarianceStamped>(
-    "/initialpose",
-    [&filter](const geometry_msgs::PoseWithCovarianceStampedConstPtr & initial_pose) {
+  player.register_callback<geometry_msgs::msg::PoseWithCovarianceStamped>(
+    "/initialpose", [&filter](const geometry_msgs::msg::PoseWithCovarianceStamped & initial_pose) {
       filter.initial_pose_cb(initial_pose);
     });
 
-  player.register_callback<tf2_msgs::TFMessage>(
-    "/tf", [&tf_pub](const tf2_msgs::TFMessageConstPtr & tf) { tf_pub.publish(tf); });
+  player.register_callback<tf2_msgs::msg::TFMessage>(
+    "/tf", [&tf_pub](const tf2_msgs::msg::TFMessage & tf) { tf_pub->publish(tf); });
 
-  player.register_callback<tf2_msgs::TFMessage>(
+  player.register_callback<tf2_msgs::msg::TFMessage>(
     "/tf_static",
-    [&tf_static_pub](const tf2_msgs::TFMessageConstPtr & tf) { tf_static_pub.publish(tf); });
+    [&tf_static_pub](const tf2_msgs::msg::TFMessage & tf) { tf_static_pub->publish(tf); });
 
   player.start_play();
 
-  ROS_INFO_NAMED(name, "%s finished", private_nh.getNamespace().c_str());
+  RCLCPP_INFO(logger, "%s finished", nh->get_name());
   return EXIT_SUCCESS;
 }
